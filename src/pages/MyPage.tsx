@@ -123,7 +123,7 @@ export default function MyPage() {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/login');
   };
 
   const displayUser = myPageData?.user ?? user;
