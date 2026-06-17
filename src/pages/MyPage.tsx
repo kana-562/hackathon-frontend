@@ -94,17 +94,17 @@ export default function MyPage() {
         switch (activeTab) {
           case 'selling': {
             const result = await api.getMySelling();
-            setSelling(result);
+            setSelling(Array.isArray(result) ? result : []);
             break;
           }
           case 'purchases': {
             const result = await api.getMyPurchases();
-            setPurchases(result);
+            setPurchases(Array.isArray(result) ? result : []);
             break;
           }
           case 'favorites': {
             const result = await api.getMyFavorites();
-            setFavorites(result);
+            setFavorites(Array.isArray(result) ? result : []);
             break;
           }
         }
@@ -127,6 +127,11 @@ export default function MyPage() {
   };
 
   const displayUser = myPageData?.user ?? user;
+
+  // Safe arrays — never null even if API returns null
+  const sellingList = Array.isArray(selling) ? selling : [];
+  const purchasesList = Array.isArray(purchases) ? purchases : [];
+  const favoritesList = Array.isArray(favorites) ? favorites : [];
 
   return (
     <div className="page" style={{ paddingBottom: 0 }}>
@@ -200,7 +205,7 @@ export default function MyPage() {
         ) : tabError ? (
           <ErrorMessage message={tabError} />
         ) : activeTab === 'selling' ? (
-          selling.length === 0 ? (
+          sellingList.length === 0 ? (
             <div className="empty-state">
               <span className="empty-state-icon">📦</span>
               <p className="empty-state-title">出品中のセットがありません</p>
@@ -216,13 +221,13 @@ export default function MyPage() {
             </div>
           ) : (
             <div className="set-list" style={{ padding: 0 }}>
-              {selling.map((set) => (
+              {sellingList.map((set) => (
                 <SetCard key={set.id} set={set} />
               ))}
             </div>
           )
         ) : activeTab === 'purchases' ? (
-          purchases.length === 0 ? (
+          purchasesList.length === 0 ? (
             <div className="empty-state">
               <span className="empty-state-icon">🛍️</span>
               <p className="empty-state-title">購入済みのセットがありません</p>
@@ -230,13 +235,13 @@ export default function MyPage() {
             </div>
           ) : (
             <div>
-              {purchases.map((tx) => (
+              {purchasesList.map((tx) => (
                 <TransactionCard key={tx.id} tx={tx} />
               ))}
             </div>
           )
         ) : (
-          favorites.length === 0 ? (
+          favoritesList.length === 0 ? (
             <div className="empty-state">
               <span className="empty-state-icon">❤️</span>
               <p className="empty-state-title">お気に入りがありません</p>
@@ -244,7 +249,7 @@ export default function MyPage() {
             </div>
           ) : (
             <div className="set-list" style={{ padding: 0 }}>
-              {favorites.map((set) => (
+              {favoritesList.map((set) => (
                 <SetCard key={set.id} set={set} />
               ))}
             </div>
