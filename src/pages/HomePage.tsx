@@ -84,7 +84,7 @@ export default function HomePage() {
           <div style={{ padding: '20px 0 8px' }}>
             <p className="section-title">何を始めてみる？</p>
             <div className="category-grid">
-              {data.categories.slice(0, 6).map((cat) => (
+              {(data.categories ?? []).slice(0, 6).map((cat) => (
                 <button
                   key={cat.id}
                   className="category-btn"
