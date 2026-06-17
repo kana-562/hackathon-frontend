@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { MOCK_MYPAGE, MOCK_SETS, MOCK_TRANSACTION } from '../api/mock';
 import { StarterSetCard, TransactionDetail, MyPageData } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import BottomNav from '../components/BottomNav';
@@ -78,7 +77,8 @@ export default function MyPage() {
         const result = await api.getMyPage();
         setMyPageData(result);
       } catch {
-        setMyPageData(MOCK_MYPAGE);
+        // API失敗時はmockを使わない（contextのuserを表示する）
+        setMyPageData(null);
       } finally {
         setMyPageLoading(false);
       }
@@ -110,9 +110,9 @@ export default function MyPage() {
         }
       } catch {
         switch (activeTab) {
-          case 'selling': setSelling(MOCK_SETS.slice(0, 2)); break;
-          case 'purchases': setPurchases([MOCK_TRANSACTION]); break;
-          case 'favorites': setFavorites(MOCK_SETS.slice(0, 3)); break;
+          case 'selling': setSelling([]); break;
+          case 'purchases': setPurchases([]); break;
+          case 'favorites': setFavorites([]); break;
         }
       } finally {
         setTabLoading(false);
