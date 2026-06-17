@@ -131,3 +131,24 @@ export interface MyPageData {
   purchasesCount: number;
   favoritesCount: number;
 }
+
+export interface DMRoom {
+  id: number;
+  partnerId: number;
+  partnerName: string;
+  partnerAvatar: string;
+  setId?: number;
+  setTitle?: string;
+  lastMessage: string;
+  lastMessageAt?: string;
+  unreadCount: number;
+}
+
+export interface DMMessage {
+  id: number;
+  roomId: number;
+  senderId: number;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}

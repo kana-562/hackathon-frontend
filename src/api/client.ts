@@ -8,6 +8,8 @@ import type {
   TransactionDetail,
   MyPageData,
   User,
+  DMRoom,
+  DMMessage,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -110,6 +112,17 @@ export const api = {
   getMySelling: () => request<StarterSetCard[]>('GET', '/api/mypage/selling'),
   getMyPurchases: () => request<TransactionDetail[]>('GET', '/api/mypage/purchases'),
   getMyFavorites: () => request<StarterSetCard[]>('GET', '/api/mypage/favorites'),
+
+  // DM
+  getOrCreateDMRoom: (partnerId: number, setId?: number) =>
+    request<{ roomId: number }>('POST', '/api/dm/rooms', { partnerId, setId }),
+  getDMRooms: () => request<DMRoom[]>('GET', '/api/dm/rooms'),
+  getDMMessages: (roomId: number) =>
+    request<DMMessage[]>('GET', `/api/dm/rooms/${roomId}/messages`),
+  sendDMMessage: (roomId: number, body: string) =>
+    request<DMMessage>('POST', `/api/dm/rooms/${roomId}/messages`, { body }),
+  markDMRead: (roomId: number) =>
+    request<{ ok: boolean }>('PATCH', `/api/dm/rooms/${roomId}/read`),
 };
 
 export function saveAuth(token: string, user: User) {

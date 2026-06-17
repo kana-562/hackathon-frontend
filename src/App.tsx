@@ -14,6 +14,8 @@ import SellConfirmPage from './pages/SellConfirmPage';
 import MyPage from './pages/MyPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import DMListPage from './pages/DMListPage';
+import DMRoomPage from './pages/DMRoomPage';
 
 export default function App() {
   return (
@@ -31,6 +33,8 @@ export default function App() {
             <Route path="/sell/support/:draftSetId" element={<SellSupportPage />} />
             <Route path="/sell/confirm/:draftSetId" element={<SellConfirmPage />} />
             <Route path="/mypage" element={<MyPage />} />
+            <Route path="/dm" element={<DMListPage />} />
+            <Route path="/dm/:roomId" element={<DMRoomPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
           </Routes>

@@ -7,6 +7,8 @@ import type {
   DraftDetail,
   TransactionDetail,
   MyPageData,
+  DMRoom,
+  DMMessage,
 } from '../types';
 
 export const MOCK_CATEGORIES: HobbyCategory[] = [
@@ -184,3 +186,55 @@ export const MOCK_MYPAGE: MyPageData = {
   purchasesCount: 1,
   favoritesCount: 3,
 };
+
+export const MOCK_DM_ROOMS: DMRoom[] = [
+  {
+    id: 1,
+    partnerId: 2,
+    partnerName: 'さとう はなこ',
+    partnerAvatar: '',
+    setId: 1,
+    setTitle: 'アコースティックギター 初心者完全セット',
+    lastMessage: 'ご質問ありがとうございます！',
+    lastMessageAt: '2026-06-17T10:00:00Z',
+    unreadCount: 1,
+  },
+  {
+    id: 2,
+    partnerId: 3,
+    partnerName: 'たなか けんじ',
+    partnerAvatar: '',
+    setId: 2,
+    setTitle: '本格コーヒー ハンドドリップ入門セット',
+    lastMessage: 'よろしくお願いします',
+    lastMessageAt: '2026-06-16T15:30:00Z',
+    unreadCount: 0,
+  },
+];
+
+export const MOCK_DM_MESSAGES: DMMessage[] = [
+  {
+    id: 1,
+    roomId: 1,
+    senderId: 2,
+    body: 'こんにちは！このギターセットについて質問があります。',
+    isRead: true,
+    createdAt: '2026-06-17T09:55:00Z',
+  },
+  {
+    id: 2,
+    roomId: 1,
+    senderId: 1,
+    body: 'はい、何でもどうぞ！',
+    isRead: true,
+    createdAt: '2026-06-17T09:57:00Z',
+  },
+  {
+    id: 3,
+    roomId: 1,
+    senderId: 2,
+    body: 'ご質問ありがとうございます！',
+    isRead: false,
+    createdAt: '2026-06-17T10:00:00Z',
+  },
+];
