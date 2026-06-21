@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { api } from '../api/client';
+import { MOCK_DM_ROOMS } from '../api/mock';
 import { useAuth } from '../hooks/useAuth';
 
 function HomeIcon() {
@@ -49,7 +50,9 @@ export default function BottomNav() {
       try {
         const rooms = await api.getDMRooms();
         setUnread((rooms ?? []).reduce((s: number, r: { unreadCount?: number }) => s + (r.unreadCount ?? 0), 0));
-      } catch { /* ignore */ }
+      } catch {
+        setUnread(MOCK_DM_ROOMS.reduce((s, r) => s + (r.unreadCount ?? 0), 0));
+      }
     };
     void fetch();
     const id = setInterval(() => void fetch(), 15000);
