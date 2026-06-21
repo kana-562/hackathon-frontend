@@ -542,6 +542,32 @@ ol {
   padding: 0 16px;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.section-header .section-title {
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.more-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 /* ==========================================
    Horizontal Scroll Row
    ========================================== */

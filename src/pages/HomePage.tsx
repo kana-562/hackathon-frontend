@@ -36,6 +36,11 @@ export default function HomePage() {
   const [searchValue, setSearchValue] = useState('');
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAllNew, setShowAllNew] = useState(false);
+  const [showAllFeatured, setShowAllFeatured] = useState(false);
+
+  const NEW_LIMIT = 5;
+  const FEATURED_LIMIT = 5;
 
   const fetchHome = async () => {
     try {
@@ -102,26 +107,56 @@ export default function HomePage() {
 
           {/* Featured: horizontal scroll */}
           <div style={{ padding: '16px 0 4px' }}>
-            <p className="section-title">おすすめセット</p>
-            <div className="horizontal-scroll">
-              {data.featuredSets.map((set) => (
-                <SetCard key={set.id} set={set} />
-              ))}
-              {data.featuredSets.length === 0 && (
-                <p style={{ padding: '0 16px', color: 'var(--color-text-secondary)', fontSize: 14 }}>
-                  セットがありません
-                </p>
+            <div className="section-header">
+              <p className="section-title">おすすめセット</p>
+              {data.featuredSets.length > FEATURED_LIMIT && (
+                <button
+                  className="more-btn"
+                  type="button"
+                  onClick={() => setShowAllFeatured((v) => !v)}
+                >
+                  {showAllFeatured ? '閉じる' : 'もっと見る ›'}
+                </button>
               )}
             </div>
+            {showAllFeatured ? (
+              <div className="set-list">
+                {data.featuredSets.map((set) => (
+                  <SetCard key={set.id} set={set} />
+                ))}
+              </div>
+            ) : (
+              <div className="horizontal-scroll">
+                {data.featuredSets.slice(0, FEATURED_LIMIT).map((set) => (
+                  <SetCard key={set.id} set={set} />
+                ))}
+                {data.featuredSets.length === 0 && (
+                  <p style={{ padding: '0 16px', color: 'var(--color-text-secondary)', fontSize: 14 }}>
+                    セットがありません
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="divider" />
 
           {/* New sets: vertical list */}
           <div style={{ padding: '16px 0 8px' }}>
-            <p className="section-title">新着セット</p>
+            <div className="section-header">
+              <p className="section-title">新着セット</p>
+              {data.newSets.length > NEW_LIMIT && (
+                <button
+                  className="more-btn"
+                  type="button"
+                  onClick={() => setShowAllNew((v) => !v)}
+                >
+                  {showAllNew ? '閉じる' : 'もっと見る ›'}
+                </button>
+              )}
+            </div>
             <div className="set-list">
-              {data.newSets.map((set) => (
+              {(showAllNew ? data.newSets : data.newSets.slice(0, NEW_LIMIT)).map((set) => (
                 <SetCard key={set.id} set={set} />
               ))}
               {data.newSets.length === 0 && (
