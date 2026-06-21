@@ -34,7 +34,7 @@ html {
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN',
     'Noto Sans JP', 'Yu Gothic', sans-serif;
-  background-color: var(--color-bg);
+  background-color: #000000;
   color: var(--color-text);
   line-height: 1.6;
   min-height: 100vh;
