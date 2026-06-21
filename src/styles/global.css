@@ -1182,11 +1182,106 @@ ol {
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.28s ease-in, opacity 0.28s ease-in;
+  transform-origin: center;
 }
 
 .chat-chip:hover {
   background: rgba(78, 205, 196, 0.25);
+}
+
+.chat-chip.exiting {
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Badge input container (SellSupportPage) */
+.sell-support-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.chat-input-with-badges {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 24px;
+  padding: 10px 16px;
+  min-height: 44px;
+  background: white;
+  cursor: text;
+  transition: border-color 0.15s;
+}
+
+.chat-input-with-badges:focus-within {
+  border-color: var(--color-primary);
+}
+
+.chat-input-with-badges.has-badges {
+  padding: 7px 14px;
+}
+
+.chat-input-inner {
+  flex: 1;
+  min-width: 60px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-family: inherit;
+  background: transparent;
+  color: var(--color-text);
+  padding: 0;
+  line-height: 1.4;
+}
+
+.chat-input-inner::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.chat-input-inner:disabled {
+  opacity: 0.6;
+}
+
+@keyframes badgePop {
+  0% { transform: scale(0.3); opacity: 0; }
+  65% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.input-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(78, 205, 196, 0.18);
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary-dark);
+  border-radius: 14px;
+  padding: 3px 6px 3px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  animation: badgePop 0.22s ease-out forwards;
+  white-space: nowrap;
+}
+
+.input-badge-remove {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.input-badge-remove:hover {
+  opacity: 1;
 }
 
 .chat-input-row {

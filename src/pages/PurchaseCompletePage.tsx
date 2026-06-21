@@ -111,10 +111,10 @@ export default function PurchaseCompletePage() {
       <div style={{ padding: '16px 16px 24px' }}>
         <button
           className="btn-primary"
-          onClick={() => navigate('/mypage')}
+          onClick={() => navigate('/mypage?tab=purchases')}
           type="button"
         >
-          マイページへ
+          購入済み商品を見る
         </button>
       </div>
 

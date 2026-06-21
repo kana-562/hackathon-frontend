@@ -85,7 +85,7 @@ export default function SellConfirmPage() {
         items,
       });
       await api.publishDraft(Number(draftSetId));
-      navigate('/mypage');
+      navigate('/mypage?tab=selling');
     } catch (e) {
       setPublishError(e instanceof Error ? e.message : '出品に失敗しました');
     } finally {

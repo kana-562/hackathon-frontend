@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { StarterSetCard, TransactionDetail, MyPageData } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -59,8 +59,13 @@ function TransactionCard({ tx }: { tx: TransactionDetail }) {
 
 export default function MyPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isLoggedIn, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabKey>('selling');
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    const p = searchParams.get('tab');
+    if (p === 'purchases' || p === 'selling' || p === 'favorites') return p;
+    return 'selling';
+  });
 
   const [myPageData, setMyPageData] = useState<MyPageData | null>(null);
   const [myPageLoading, setMyPageLoading] = useState(true);

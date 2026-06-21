@@ -5,7 +5,12 @@ import { api } from '../api/client';
 interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
-  chips?: string[];
+}
+
+interface ChipItem {
+  id: number;
+  text: string;
+  exiting: boolean;
 }
 
 interface LocationState {
@@ -14,23 +19,54 @@ interface LocationState {
   progress: { current: number; total: number };
 }
 
+// When a chip is selected, suggest these additional chips (if not already shown)
+const CHIP_EXPANSIONS: Record<string, string[]> = {
+  'ギター本体':    ['ストラップ', 'ギターケース'],
+  'チューナー':    ['替え弦', '替え電池'],
+  'ピック':       ['サムピック'],
+  'カポタスト':    ['スライドバー'],
+  'ギタースタンド': ['壁掛けハンガー'],
+  'コード譜':      ['教則DVD'],
+  'ドリッパー':    ['コーヒーサーバー'],
+  'コーヒーミル':  ['クリーニングブラシ'],
+  'ドリップポット': ['温度計'],
+  '細口ドリップポット': ['温度計'],
+  'ヨガマット':    ['ヨガブロック', 'ヨガベルト'],
+  'ロッド':       ['リール', 'ライン'],
+  'リール':       ['仕掛けセット'],
+  'テント':       ['ペグ', 'ロープ'],
+  'シュラフ':     ['インナーシュラフ'],
+  'バーナー':     ['ガスカートリッジ'],
+  'スケッチブック': ['ペン立て'],
+  'コピック':     ['コピック補充インク'],
+};
+
 export default function SellSupportPage() {
   const { draftSetId } = useParams<{ draftSetId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-
   const state = location.state as LocationState | null;
 
+  const chipIdRef = useRef(0);
+  const knownChipTexts = useRef(new Set<string>());
+
+  const [chips, setChips] = useState<ChipItem[]>(() => {
+    const initialTexts = state?.suggestedChips ?? [];
+    return initialTexts.map(t => {
+      knownChipTexts.current.add(t);
+      return { id: ++chipIdRef.current, text: t, exiting: false };
+    });
+  });
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (state?.message) {
-      return [{ sender: 'assistant', text: state.message, chips: state.suggestedChips ?? [] }];
-    }
+    if (state?.message) return [{ sender: 'assistant', text: state.message }];
     return [];
   });
-  const [input, setInput] = useState('');
+  const [selectedBadges, setSelectedBadges] = useState<string[]>([]);
+  const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const [showChips, setShowChips] = useState(!!state?.suggestedChips?.length);
   const [progress, setProgress] = useState(state?.progress ?? { current: 0, total: 5 });
-  const [activeChips, setActiveChips] = useState<string[]>(state?.suggestedChips ?? []);
   const chatRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -44,86 +80,106 @@ export default function SellSupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, sending]);
 
-  // If no state (e.g., direct navigation), show a fallback greeting
   useEffect(() => {
     if (!state && draftSetId) {
-      setMessages([{
-        sender: 'assistant',
-        text: 'セットについて教えてください。どんなものが入っていますか？',
-        chips: ['まず確認したい', '箱に入っています', '袋に入っています'],
-      }]);
+      const fallbackChips = ['まず確認したい', '箱に入っています', '袋に入っています'];
+      fallbackChips.forEach(t => knownChipTexts.current.add(t));
+      setMessages([{ sender: 'assistant', text: 'セットについて教えてください。どんなものが入っていますか？' }]);
+      setChips(fallbackChips.map(t => ({ id: ++chipIdRef.current, text: t, exiting: false })));
+      setShowChips(true);
     }
-    // Run once on mount only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const getSubmitText = () =>
+    [...selectedBadges, inputText.trim()].filter(Boolean).join('、');
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending || !draftSetId) return;
 
-    const userMsg: ChatMessage = { sender: 'user', text };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setActiveChips([]);
+    setMessages(prev => [...prev, { sender: 'user', text }]);
+    setInputText('');
+    setSelectedBadges([]);
+    setChips([]);
+    setShowChips(false);
+    knownChipTexts.current.clear();
     setSending(true);
 
     try {
       const res = await api.sendSellMessage(Number(draftSetId), text);
-      const assistantMsg: ChatMessage = {
-        sender: 'assistant',
-        text: res.message,
-        chips: res.suggestedChips ?? [],
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages(prev => [...prev, { sender: 'assistant', text: res.message }]);
       setProgress(res.progress);
-      setActiveChips(res.suggestedChips ?? []);
+
+      const newTexts = res.suggestedChips ?? [];
+      newTexts.forEach(t => knownChipTexts.current.add(t));
+      setChips(newTexts.map(t => ({ id: ++chipIdRef.current, text: t, exiting: false })));
+      setShowChips(newTexts.length > 0);
 
       if (res.done) {
-        // Brief pause then navigate to confirm
-        setTimeout(() => {
-          navigate(`/sell/confirm/${draftSetId}`);
-        }, 1200);
+        setTimeout(() => navigate(`/sell/confirm/${draftSetId}`), 1200);
       }
     } catch {
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
-        {
-          sender: 'assistant',
-          text: 'エラーが発生しました。もう一度試してください。',
-        },
+        { sender: 'assistant', text: 'エラーが発生しました。もう一度試してください。' },
       ]);
     } finally {
       setSending(false);
     }
   };
 
-  const handleChipClick = (chip: string) => {
-    setInput((prev) => prev ? `${prev}、${chip}` : chip);
+  const handleChipClick = (chip: ChipItem) => {
+    // Animate chip out
+    setChips(prev => prev.map(c => c.id === chip.id ? { ...c, exiting: true } : c));
+
+    // Add to input badges
+    setSelectedBadges(prev => [...prev, chip.text]);
+
+    // Find new related chips not yet shown
+    const expansions = (CHIP_EXPANSIONS[chip.text] ?? []).filter(
+      t => !knownChipTexts.current.has(t),
+    );
+    expansions.forEach(t => knownChipTexts.current.add(t));
+
+    // After exit animation: remove chip + add expansions
+    setTimeout(() => {
+      setChips(prev => {
+        const remaining = prev.filter(c => c.id !== chip.id);
+        const newChips = expansions.map(t => ({
+          id: ++chipIdRef.current,
+          text: t,
+          exiting: false,
+        }));
+        return [...remaining, ...newChips];
+      });
+    }, 280);
   };
 
-  const handleSubmit = () => {
-    void sendMessage(input);
+  const removeBadge = (index: number) => {
+    const text = selectedBadges[index];
+    setSelectedBadges(prev => prev.filter((_, i) => i !== index));
+    // Return chip to suggestion list
+    if (!chips.some(c => c.text === text)) {
+      knownChipTexts.current.add(text);
+      setChips(prev => [...prev, { id: ++chipIdRef.current, text, exiting: false }]);
+    }
   };
 
+  const handleSubmit = () => void sendMessage(getSubmitText());
   const progressPercent = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
+  const submitText = getSubmitText();
 
   return (
     <div className="sell-support-page">
       {/* Header */}
       <div className="sell-support-header">
-        <button
-          className="back-button"
-          onClick={() => navigate(-1)}
-          type="button"
-          aria-label="戻る"
-        >
+        <button className="back-button" onClick={() => navigate(-1)} type="button" aria-label="戻る">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
         <span className="sell-support-title">出品サポート</span>
-        <span className="sell-support-progress">
-          {progress.current}/{progress.total}
-        </span>
+        <span className="sell-support-progress">{progress.current}/{progress.total}</span>
       </div>
 
       {/* Progress bar */}
@@ -136,30 +192,25 @@ export default function SellSupportPage() {
       {/* Chat area */}
       <div className="sell-support-chat" ref={chatRef}>
         {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className={`chat-bubble ${msg.sender}`}>
-              {msg.text}
-            </div>
-            {/* Show chips only for last assistant message when not sending */}
-            {msg.sender === 'assistant' &&
-              i === messages.length - 1 &&
-              !sending &&
-              activeChips.length > 0 && (
-                <div className="chat-chips">
-                  {activeChips.map((chip) => (
-                    <button
-                      key={chip}
-                      className="chat-chip"
-                      onClick={() => handleChipClick(chip)}
-                      type="button"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div key={i} className={`chat-bubble ${msg.sender}`}>
+            {msg.text}
           </div>
         ))}
+
+        {showChips && chips.length > 0 && !sending && (
+          <div className="chat-chips">
+            {chips.map(chip => (
+              <button
+                key={chip.id}
+                className={`chat-chip${chip.exiting ? ' exiting' : ''}`}
+                onClick={() => !chip.exiting && handleChipClick(chip)}
+                type="button"
+              >
+                {chip.text}
+              </button>
+            ))}
+          </div>
+        )}
 
         {sending && (
           <div className="typing-indicator">
@@ -172,26 +223,38 @@ export default function SellSupportPage() {
 
       {/* Input area */}
       <div className="sell-support-input-area">
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input
-            className="chat-input"
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            placeholder="メッセージを入力..."
-            disabled={sending}
-            style={{ flex: 1 }}
-          />
+        <div className="sell-support-input-row">
+          <div className={`chat-input-with-badges${selectedBadges.length > 0 ? ' has-badges' : ''}`}>
+            {selectedBadges.map((badge, i) => (
+              <span key={i} className="input-badge">
+                {badge}
+                <button
+                  className="input-badge-remove"
+                  onClick={() => removeBadge(i)}
+                  type="button"
+                  aria-label={`${badge}を削除`}
+                >×</button>
+              </span>
+            ))}
+            <input
+              className="chat-input-inner"
+              type="text"
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              placeholder={selectedBadges.length > 0 ? '' : 'メッセージを入力...'}
+              disabled={sending}
+            />
+          </div>
           <button
             className="chat-send-btn"
             onClick={handleSubmit}
-            disabled={!input.trim() || sending}
+            disabled={!submitText || sending}
             type="button"
             aria-label="送信"
           >
