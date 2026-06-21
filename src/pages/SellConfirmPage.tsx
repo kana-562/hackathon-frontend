@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { MOCK_DRAFT } from '../api/mock';
 import { DraftDetail, SetItemDTO } from '../types';
@@ -18,12 +18,18 @@ const CONDITION_OPTIONS = [
 export default function SellConfirmPage() {
   const { draftSetId } = useParams<{ draftSetId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = location.state as { suggestedPrice?: number } | null;
 
   const [draft, setDraft] = useState<DraftDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+
+  // Image upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -41,7 +47,8 @@ export default function SellConfirmPage() {
       const result = await api.getDraft(Number(draftSetId));
       setDraft(result);
       setTitle(result.title);
-      setPrice(result.price);
+      // Use suggested price from SellSupportPage if draft price is 0
+      setPrice(result.price > 0 ? result.price : (navState?.suggestedPrice ?? 0));
       setDescription(result.description);
       setReadinessScore(result.readinessScore);
       setPreviousOwnerNote(result.previousOwnerNote);
@@ -50,7 +57,7 @@ export default function SellConfirmPage() {
       const m = MOCK_DRAFT;
       setDraft(m);
       setTitle(m.title);
-      setPrice(m.price);
+      setPrice(m.price > 0 ? m.price : (navState?.suggestedPrice ?? 0));
       setDescription(m.description);
       setReadinessScore(m.readinessScore);
       setPreviousOwnerNote(m.previousOwnerNote);
@@ -64,6 +71,20 @@ export default function SellConfirmPage() {
     void fetchDraft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftSetId]);
+
+  // Revoke object URL on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   const handleItemConditionChange = (id: number, value: string) => {
     setItems((prev) =>
@@ -114,13 +135,34 @@ export default function SellConfirmPage() {
         <div style={{ width: 28 }} />
       </div>
 
-      {/* Preview card */}
-      <div className="preview-card">
-        <div className="preview-card-image">🎯</div>
-        <div className="preview-card-body">
-          <p className="preview-card-title">{title || '（タイトル未設定）'}</p>
-          <p className="preview-card-price">¥{(price || 0).toLocaleString()}</p>
-        </div>
+      {/* Image upload banner */}
+      <div
+        className="preview-image-upload"
+        onClick={() => fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
+        aria-label="写真をアップロード"
+      >
+        {imagePreview ? (
+          <img src={imagePreview} alt="セット画像" className="preview-image-uploaded" />
+        ) : (
+          <div className="preview-image-placeholder">
+            <span className="preview-image-icon">📷</span>
+            <p>タップして写真を追加</p>
+            <p className="preview-image-sub">JPG・PNG・GIF</p>
+          </div>
+        )}
+        {imagePreview && (
+          <div className="preview-image-change-hint">タップして変更</div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          style={{ display: 'none' }}
+        />
       </div>
 
       {/* Editable form */}

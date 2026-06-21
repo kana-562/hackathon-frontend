@@ -19,7 +19,8 @@ interface LocationState {
   progress: { current: number; total: number };
 }
 
-// When a chip is selected, suggest these additional chips (if not already shown)
+const CONDITION_OPTIONS = ['ほぼ新品', '目立った傷なし', 'やや傷あり', '傷・汚れあり', '動作未確認'];
+
 const CHIP_EXPANSIONS: Record<string, string[]> = {
   'ギター本体':    ['ストラップ', 'ギターケース'],
   'チューナー':    ['替え弦', '替え電池'],
@@ -41,6 +42,22 @@ const CHIP_EXPANSIONS: Record<string, string[]> = {
   'コピック':     ['コピック補充インク'],
 };
 
+function parsePrice(text: string): number | null {
+  // Normalize full-width digits
+  let s = text.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  // Handle 万
+  const manMatch = s.match(/(\d[\d,，]*)\s*万/);
+  if (manMatch) return parseInt(manMatch[1].replace(/[,，]/g, ''), 10) * 10000;
+  // Strip non-numeric
+  s = s.replace(/[¥￥円,，、\s]/g, '');
+  const m = s.match(/\d+/);
+  if (m) {
+    const n = parseInt(m[0], 10);
+    if (n > 0 && n < 10_000_000) return n;
+  }
+  return null;
+}
+
 export default function SellSupportPage() {
   const { draftSetId } = useParams<{ draftSetId: string }>();
   const navigate = useNavigate();
@@ -49,6 +66,7 @@ export default function SellSupportPage() {
 
   const chipIdRef = useRef(0);
   const knownChipTexts = useRef(new Set<string>());
+  const parsedPriceRef = useRef<number | null>(null);
 
   const [chips, setChips] = useState<ChipItem[]>(() => {
     const initialTexts = state?.suggestedChips ?? [];
@@ -67,6 +85,11 @@ export default function SellSupportPage() {
   const [sending, setSending] = useState(false);
   const [showChips, setShowChips] = useState(!!state?.suggestedChips?.length);
   const [progress, setProgress] = useState(state?.progress ?? { current: 0, total: 5 });
+
+  // Step-specific state
+  const [itemsList, setItemsList] = useState<string[]>([]);
+  const [conditionMap, setConditionMap] = useState<Record<string, string>>({});
+
   const chatRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -91,11 +114,31 @@ export default function SellSupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const getSubmitText = () =>
-    [...selectedBadges, inputText.trim()].filter(Boolean).join('、');
+  const getSubmitText = () => {
+    // Step 2: serialize condition table
+    if (progress.current === 1 && itemsList.length > 0) {
+      return itemsList.map(item => `${item}は${conditionMap[item] ?? '目立った傷なし'}`).join('、');
+    }
+    return [...selectedBadges, inputText.trim()].filter(Boolean).join('、');
+  };
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending || !draftSetId) return;
+
+    // Capture items from step 1 before clearing state
+    if (progress.current === 0) {
+      const items = text.split(/[、,，]+/).map(s => s.trim()).filter(Boolean);
+      setItemsList(items);
+      const initMap: Record<string, string> = {};
+      items.forEach(item => { initMap[item] = '目立った傷なし'; });
+      setConditionMap(initMap);
+    }
+
+    // Parse price from step 3 input
+    if (progress.current === 2) {
+      const price = parsePrice(text);
+      if (price !== null) parsedPriceRef.current = price;
+    }
 
     setMessages(prev => [...prev, { sender: 'user', text }]);
     setInputText('');
@@ -113,10 +156,13 @@ export default function SellSupportPage() {
       const newTexts = res.suggestedChips ?? [];
       newTexts.forEach(t => knownChipTexts.current.add(t));
       setChips(newTexts.map(t => ({ id: ++chipIdRef.current, text: t, exiting: false })));
-      setShowChips(newTexts.length > 0);
+      // Don't show as chips for price step — show as recommendation card instead
+      setShowChips(newTexts.length > 0 && res.progress.current !== 2);
 
       if (res.done) {
-        setTimeout(() => navigate(`/sell/confirm/${draftSetId}`), 1200);
+        setTimeout(() => navigate(`/sell/confirm/${draftSetId}`, {
+          state: { suggestedPrice: parsedPriceRef.current },
+        }), 1200);
       }
     } catch {
       setMessages(prev => [
@@ -129,19 +175,14 @@ export default function SellSupportPage() {
   };
 
   const handleChipClick = (chip: ChipItem) => {
-    // Animate chip out
     setChips(prev => prev.map(c => c.id === chip.id ? { ...c, exiting: true } : c));
-
-    // Add to input badges
     setSelectedBadges(prev => [...prev, chip.text]);
 
-    // Find new related chips not yet shown
     const expansions = (CHIP_EXPANSIONS[chip.text] ?? []).filter(
       t => !knownChipTexts.current.has(t),
     );
     expansions.forEach(t => knownChipTexts.current.add(t));
 
-    // After exit animation: remove chip + add expansions
     setTimeout(() => {
       setChips(prev => {
         const remaining = prev.filter(c => c.id !== chip.id);
@@ -158,11 +199,17 @@ export default function SellSupportPage() {
   const removeBadge = (index: number) => {
     const text = selectedBadges[index];
     setSelectedBadges(prev => prev.filter((_, i) => i !== index));
-    // Return chip to suggestion list
     if (!chips.some(c => c.text === text)) {
       knownChipTexts.current.add(text);
       setChips(prev => [...prev, { id: ++chipIdRef.current, text, exiting: false }]);
     }
+  };
+
+  const addTextAsBadge = () => {
+    const text = inputText.trim();
+    if (!text || sending) return;
+    setSelectedBadges(prev => [...prev, text]);
+    setInputText('');
   };
 
   const handleSubmit = () => void sendMessage(getSubmitText());
@@ -197,19 +244,61 @@ export default function SellSupportPage() {
           </div>
         ))}
 
-        {showChips && chips.length > 0 && !sending && (
-          <div className="chat-chips">
-            {chips.map(chip => (
-              <button
-                key={chip.id}
-                className={`chat-chip${chip.exiting ? ' exiting' : ''}`}
-                onClick={() => !chip.exiting && handleChipClick(chip)}
-                type="button"
-              >
-                {chip.text}
-              </button>
-            ))}
-          </div>
+        {!sending && (
+          progress.current === 1 && itemsList.length > 0 ? (
+            /* Condition table for step 2 */
+            <div className="condition-table-container">
+              <table className="condition-table">
+                <thead>
+                  <tr>
+                    <th>アイテム</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemsList.map(item => (
+                    <tr key={item}>
+                      <td>{item}</td>
+                      <td>
+                        <select
+                          value={conditionMap[item] ?? '目立った傷なし'}
+                          onChange={e => setConditionMap(prev => ({ ...prev, [item]: e.target.value }))}
+                          className="condition-select"
+                        >
+                          {CONDITION_OPTIONS.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : progress.current === 2 ? (
+            /* Price recommendation card for step 3 */
+            <div className="price-rec-card">
+              <p className="price-rec-title">💡 おすすめ価格帯</p>
+              {chips.length >= 2 && (
+                <p className="price-rec-range">{chips[0].text} 〜 {chips[chips.length - 1].text}</p>
+              )}
+              <p className="price-rec-reason">同ジャンルのスターターセットの相場に基づいた参考価格です。状態や付属品によって調整してください。</p>
+            </div>
+          ) : showChips && chips.length > 0 ? (
+            /* Regular chips */
+            <div className="chat-chips">
+              {chips.map(chip => (
+                <button
+                  key={chip.id}
+                  className={`chat-chip${chip.exiting ? ' exiting' : ''}`}
+                  onClick={() => !chip.exiting && handleChipClick(chip)}
+                  type="button"
+                >
+                  {chip.text}
+                </button>
+              ))}
+            </div>
+          ) : null
         )}
 
         {sending && (
@@ -242,12 +331,20 @@ export default function SellSupportPage() {
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                if (e.nativeEvent.isComposing) return;
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault();
                   handleSubmit();
+                } else if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (inputText.trim()) {
+                    addTextAsBadge();
+                  } else {
+                    handleSubmit();
+                  }
                 }
               }}
-              placeholder={selectedBadges.length > 0 ? '' : 'メッセージを入力...'}
+              placeholder={selectedBadges.length > 0 ? '' : progress.current === 1 ? '追加のメモを入力...' : 'メッセージを入力...'}
               disabled={sending}
             />
           </div>
@@ -264,6 +361,7 @@ export default function SellSupportPage() {
             </svg>
           </button>
         </div>
+        <div className="chat-input-hint">⌘+Enter で送信</div>
       </div>
     </div>
   );
