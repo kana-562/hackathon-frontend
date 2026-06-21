@@ -2045,6 +2045,77 @@ ol {
   padding: 20px 16px 100px;
 }
 
+/* Item editing rows in SellConfirmPage */
+.confirm-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.confirm-item-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.confirm-item-name::placeholder {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.confirm-item-condition {
+  flex-shrink: 0;
+  font-size: 12px !important;
+  padding: 5px 24px 5px 8px !important;
+  min-width: 0;
+}
+
+.confirm-item-delete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.confirm-item-delete:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.confirm-add-item-btn {
+  width: 100%;
+  padding: 10px 0;
+  background: none;
+  border: 1.5px dashed var(--color-border);
+  border-radius: 10px;
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.confirm-add-item-btn:active {
+  background: rgba(78, 205, 196, 0.06);
+}
+
 .sell-publish-bar {
   position: fixed;
   bottom: 0;

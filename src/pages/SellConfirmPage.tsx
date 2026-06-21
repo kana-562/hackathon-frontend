@@ -6,14 +6,24 @@ import { DraftDetail, SetItemDTO } from '../types';
 import ErrorMessage from '../components/ErrorMessage';
 import LoadingSpinner from '../components/LoadingSpinner';
 
-const CONDITION_OPTIONS = [
-  '未使用に近い',
-  '良い',
-  '目立った傷や汚れなし',
-  'やや傷や汚れあり',
-  '傷や汚れあり',
-  '全体的に状態が悪い',
-];
+// Shared condition options (same as SellSupportPage)
+const CONDITION_OPTIONS = ['ほぼ新品', '目立った傷なし', 'やや傷あり', '傷・汚れあり', '動作未確認'];
+
+// Map API-returned English condition codes → Japanese labels
+function mapConditionLabel(label: string): string {
+  const map: Record<string, string> = {
+    new: 'ほぼ新品',
+    like_new: 'ほぼ新品',
+    good: '目立った傷なし',
+    fair: 'やや傷あり',
+    poor: '傷・汚れあり',
+    unknown: '動作未確認',
+  };
+  return CONDITION_OPTIONS.includes(label) ? label : (map[label] ?? '目立った傷なし');
+}
+
+let nextTempId = -1;
+const newTempId = () => nextTempId--;
 
 export default function SellConfirmPage() {
   const { draftSetId } = useParams<{ draftSetId: string }>();
@@ -43,7 +53,7 @@ export default function SellConfirmPage() {
   const [previousOwnerNote, setPreviousOwnerNote] = useState('');
   const [items, setItems] = useState<SetItemDTO[]>([]);
 
-  // Build items from chat-captured list+condition, or fall back to API items
+  // Build items: prefer chat-captured items, fall back to API items
   const buildItems = (apiItems: SetItemDTO[]): SetItemDTO[] => {
     const chatItems = navState?.itemsList ?? [];
     const chatConditions = navState?.conditionMap ?? {};
@@ -51,13 +61,16 @@ export default function SellConfirmPage() {
       return chatItems.map((name, idx) => ({
         id: idx + 1,
         name,
-        conditionLabel: chatConditions[name] ?? '目立った傷や汚れなし',
+        conditionLabel: chatConditions[name] ?? '目立った傷なし',
         quantity: 1,
         isEssential: true,
         note: '',
       }));
     }
-    return apiItems;
+    return apiItems.map(item => ({
+      ...item,
+      conditionLabel: mapConditionLabel(item.conditionLabel),
+    }));
   };
 
   const fetchDraft = async () => {
@@ -68,12 +81,10 @@ export default function SellConfirmPage() {
       const result = await api.getDraft(Number(draftSetId));
       setDraft(result);
       setTitle(result.title);
-      // Use suggested price from SellSupportPage if draft price is 0
       setPrice(result.price > 0 ? result.price : (navState?.suggestedPrice ?? 0));
       setDescription(result.description);
       setReadinessScore(result.readinessScore);
       setPreviousOwnerNote(result.previousOwnerNote);
-      // Override with chat-captured items if available
       setItems(buildItems(result.items));
     } catch {
       const m = MOCK_DRAFT;
@@ -94,7 +105,6 @@ export default function SellConfirmPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftSetId]);
 
-  // Revoke object URL on unmount to avoid memory leaks
   useEffect(() => {
     return () => {
       if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
@@ -108,10 +118,27 @@ export default function SellConfirmPage() {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  const handleItemNameChange = (id: number, value: string) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, name: value } : item));
+  };
+
   const handleItemConditionChange = (id: number, value: string) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, conditionLabel: value } : item))
-    );
+    setItems(prev => prev.map(item => item.id === id ? { ...item, conditionLabel: value } : item));
+  };
+
+  const deleteItem = (id: number) => {
+    setItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const addItem = () => {
+    setItems(prev => [...prev, {
+      id: newTempId(),
+      name: '',
+      conditionLabel: '目立った傷なし',
+      quantity: 1,
+      isEssential: false,
+      note: '',
+    }]);
   };
 
   const handlePublish = async () => {
@@ -136,13 +163,8 @@ export default function SellConfirmPage() {
     }
   };
 
-  if (loading) {
-    return <LoadingSpinner message="下書きを読み込み中..." />;
-  }
-
-  if (error || !draft) {
-    return <ErrorMessage message={error ?? '下書きが見つかりません'} onRetry={fetchDraft} />;
-  }
+  if (loading) return <LoadingSpinner message="下書きを読み込み中..." />;
+  if (error || !draft) return <ErrorMessage message={error ?? '下書きが見つかりません'} onRetry={fetchDraft} />;
 
   return (
     <div style={{ paddingBottom: 100, paddingTop: 'env(safe-area-inset-top, 0)' }}>
@@ -159,39 +181,40 @@ export default function SellConfirmPage() {
 
       {/* Image upload banner */}
       <div style={{ margin: '12px 16px 0', borderRadius: 14, overflow: 'hidden' }}>
-      <div
-        className="preview-image-upload"
-        style={{ borderRadius: 0 }}
-        onClick={() => fileInputRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
-        aria-label="写真をアップロード"
-      >
-        {imagePreview ? (
-          <img src={imagePreview} alt="セット画像" className="preview-image-uploaded" />
-        ) : (
-          <div className="preview-image-placeholder">
-            <span className="preview-image-icon">📷</span>
-            <p>タップして写真を追加</p>
-            <p className="preview-image-sub">JPG・PNG・GIF</p>
-          </div>
-        )}
-        {imagePreview && (
-          <div className="preview-image-change-hint">タップして変更</div>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageChange}
-          style={{ display: 'none' }}
-        />
-      </div>
+        <div
+          className="preview-image-upload"
+          style={{ borderRadius: 0 }}
+          onClick={() => fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
+          aria-label="写真をアップロード"
+        >
+          {imagePreview ? (
+            <img src={imagePreview} alt="セット画像" className="preview-image-uploaded" />
+          ) : (
+            <div className="preview-image-placeholder">
+              <span className="preview-image-icon">📷</span>
+              <p>タップして写真を追加</p>
+              <p className="preview-image-sub">JPG・PNG・GIF</p>
+            </div>
+          )}
+          {imagePreview && (
+            <div className="preview-image-change-hint">タップして変更</div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            style={{ display: 'none' }}
+          />
+        </div>
       </div>
 
       {/* Editable form */}
       <div className="sell-confirm-form">
+
         {/* Title */}
         <div className="form-group">
           <label className="form-label" htmlFor="title">セット名</label>
@@ -200,8 +223,8 @@ export default function SellConfirmPage() {
             className="form-input"
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="例: 初心者向けアコースティックギターセット"
+            onChange={e => setTitle(e.target.value)}
+            placeholder="例: アコギ入門セット"
           />
         </div>
 
@@ -214,8 +237,8 @@ export default function SellConfirmPage() {
             type="number"
             min={0}
             value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
-            placeholder="例: 15000"
+            onChange={e => setPrice(Number(e.target.value))}
+            placeholder="例: 8000"
           />
         </div>
 
@@ -226,54 +249,62 @@ export default function SellConfirmPage() {
             id="description"
             className="form-textarea"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="セットの説明を入力してください"
+            onChange={e => setDescription(e.target.value)}
+            placeholder="このセットでどんなことが始められるか、どんな方におすすめかを書きましょう"
             rows={4}
           />
         </div>
 
-        {/* Items list */}
-        {items.length > 0 && (
-          <div className="form-group">
-            <label className="form-label">入っているもの（状態を確認）</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {items.map((item) => (
-                <div key={item.id} style={{
-                  background: 'white',
-                  borderRadius: 10,
-                  padding: '10px 12px',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'center',
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</p>
-                    {item.quantity > 1 && (
-                      <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>×{item.quantity}</p>
-                    )}
-                  </div>
-                  <select
-                    className="form-select"
-                    value={item.conditionLabel}
-                    onChange={(e) => handleItemConditionChange(item.id, e.target.value)}
-                    style={{ width: 'auto', fontSize: 13, padding: '6px 28px 6px 10px' }}
-                  >
-                    {CONDITION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
+        {/* Items */}
+        <div className="form-group">
+          <label className="form-label">入っているもの</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {items.map(item => (
+              <div key={item.id} className="confirm-item-row">
+                <input
+                  className="confirm-item-name"
+                  type="text"
+                  value={item.name}
+                  onChange={e => handleItemNameChange(item.id, e.target.value)}
+                  placeholder="アイテム名"
+                />
+                <select
+                  className="condition-select confirm-item-condition"
+                  value={item.conditionLabel}
+                  onChange={e => handleItemConditionChange(item.id, e.target.value)}
+                >
+                  {CONDITION_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                <button
+                  className="confirm-item-delete"
+                  onClick={() => deleteItem(item.id)}
+                  type="button"
+                  aria-label={`${item.name}を削除`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+            <button
+              className="confirm-add-item-btn"
+              onClick={addItem}
+              type="button"
+            >
+              ＋ 商品を追加
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Readiness score */}
         <div className="form-group">
-          <label className="form-label">
-            セット充実度（{readinessScore}%）
-          </label>
+          <label className="form-label">セット充実度（{readinessScore}%）</label>
           <input
             className="range-input"
             type="range"
@@ -281,7 +312,7 @@ export default function SellConfirmPage() {
             max={100}
             step={5}
             value={readinessScore}
-            onChange={(e) => setReadinessScore(Number(e.target.value))}
+            onChange={e => setReadinessScore(Number(e.target.value))}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4 }}>
             <span>セット内容が少ない</span>
@@ -296,7 +327,7 @@ export default function SellConfirmPage() {
             id="owner-note"
             className="form-textarea"
             value={previousOwnerNote}
-            onChange={(e) => setPreviousOwnerNote(e.target.value)}
+            onChange={e => setPreviousOwnerNote(e.target.value)}
             placeholder="次の人へのメッセージや使用経験などを書きましょう"
             rows={3}
           />
