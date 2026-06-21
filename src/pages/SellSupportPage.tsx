@@ -97,7 +97,7 @@ export default function SellSupportPage() {
   };
 
   const handleChipClick = (chip: string) => {
-    void sendMessage(chip);
+    setInput((prev) => prev ? `${prev}、${chip}` : chip);
   };
 
   const handleSubmit = () => {
