@@ -26,16 +26,16 @@ export default function SetCard({ set }: Props) {
     }
     if (favoriteLoading) return;
     setFavoriteLoading(true);
+    const prev = isFavorite;
+    setIsFavorite(!prev);
     try {
-      if (isFavorite) {
+      if (prev) {
         await api.removeFavorite(set.id);
-        setIsFavorite(false);
       } else {
         await api.addFavorite(set.id);
-        setIsFavorite(true);
       }
     } catch {
-      // ignore
+      setIsFavorite(prev);
     } finally {
       setFavoriteLoading(false);
     }

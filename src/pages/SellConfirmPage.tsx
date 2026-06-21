@@ -19,7 +19,11 @@ export default function SellConfirmPage() {
   const { draftSetId } = useParams<{ draftSetId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const navState = location.state as { suggestedPrice?: number } | null;
+  const navState = location.state as {
+    suggestedPrice?: number;
+    itemsList?: string[];
+    conditionMap?: Record<string, string>;
+  } | null;
 
   const [draft, setDraft] = useState<DraftDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +43,23 @@ export default function SellConfirmPage() {
   const [previousOwnerNote, setPreviousOwnerNote] = useState('');
   const [items, setItems] = useState<SetItemDTO[]>([]);
 
+  // Build items from chat-captured list+condition, or fall back to API items
+  const buildItems = (apiItems: SetItemDTO[]): SetItemDTO[] => {
+    const chatItems = navState?.itemsList ?? [];
+    const chatConditions = navState?.conditionMap ?? {};
+    if (chatItems.length > 0) {
+      return chatItems.map((name, idx) => ({
+        id: idx + 1,
+        name,
+        conditionLabel: chatConditions[name] ?? '目立った傷や汚れなし',
+        quantity: 1,
+        isEssential: true,
+        note: '',
+      }));
+    }
+    return apiItems;
+  };
+
   const fetchDraft = async () => {
     if (!draftSetId) return;
     try {
@@ -52,7 +73,8 @@ export default function SellConfirmPage() {
       setDescription(result.description);
       setReadinessScore(result.readinessScore);
       setPreviousOwnerNote(result.previousOwnerNote);
-      setItems(result.items);
+      // Override with chat-captured items if available
+      setItems(buildItems(result.items));
     } catch {
       const m = MOCK_DRAFT;
       setDraft(m);
@@ -61,7 +83,7 @@ export default function SellConfirmPage() {
       setDescription(m.description);
       setReadinessScore(m.readinessScore);
       setPreviousOwnerNote(m.previousOwnerNote);
-      setItems(m.items);
+      setItems(buildItems(m.items));
     } finally {
       setLoading(false);
     }
@@ -196,7 +218,7 @@ export default function SellConfirmPage() {
 
         {/* Description */}
         <div className="form-group">
-          <label className="form-label" htmlFor="description">説明文</label>
+          <label className="form-label" htmlFor="description">説明文（このセットで始められること）</label>
           <textarea
             id="description"
             className="form-textarea"

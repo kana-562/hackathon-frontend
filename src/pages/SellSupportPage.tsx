@@ -43,12 +43,9 @@ const CHIP_EXPANSIONS: Record<string, string[]> = {
 };
 
 function parsePrice(text: string): number | null {
-  // Normalize full-width digits
   let s = text.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
-  // Handle 万
   const manMatch = s.match(/(\d[\d,，]*)\s*万/);
   if (manMatch) return parseInt(manMatch[1].replace(/[,，]/g, ''), 10) * 10000;
-  // Strip non-numeric
   s = s.replace(/[¥￥円,，、\s]/g, '');
   const m = s.match(/\d+/);
   if (m) {
@@ -67,6 +64,9 @@ export default function SellSupportPage() {
   const chipIdRef = useRef(0);
   const knownChipTexts = useRef(new Set<string>());
   const parsedPriceRef = useRef<number | null>(null);
+  // Refs for async-safe access when navigating after done
+  const capturedItemsRef = useRef<string[]>([]);
+  const capturedConditionMapRef = useRef<Record<string, string>>({});
 
   const [chips, setChips] = useState<ChipItem[]>(() => {
     const initialTexts = state?.suggestedChips ?? [];
@@ -84,18 +84,16 @@ export default function SellSupportPage() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [showChips, setShowChips] = useState(!!state?.suggestedChips?.length);
-  const [progress, setProgress] = useState(state?.progress ?? { current: 0, total: 5 });
+  // progress.current: 1=items, 2=condition, 3=price, 4=note, 5=done
+  const [progress, setProgress] = useState(state?.progress ?? { current: 1, total: 5 });
 
-  // Step-specific state
   const [itemsList, setItemsList] = useState<string[]>([]);
   const [conditionMap, setConditionMap] = useState<Record<string, string>>({});
 
   const chatRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   };
 
   useEffect(() => {
@@ -115,9 +113,11 @@ export default function SellSupportPage() {
   }, []);
 
   const getSubmitText = () => {
-    // Step 2: serialize condition table
-    if (progress.current === 1 && itemsList.length > 0) {
-      return itemsList.map(item => `${item}は${conditionMap[item] ?? '目立った傷なし'}`).join('、');
+    // Condition table (step 2)
+    if (progress.current === 2 && capturedItemsRef.current.length > 0) {
+      return capturedItemsRef.current
+        .map(item => `${item}は${capturedConditionMapRef.current[item] ?? '目立った傷なし'}`)
+        .join('、');
     }
     return [...selectedBadges, inputText.trim()].filter(Boolean).join('、');
   };
@@ -125,17 +125,19 @@ export default function SellSupportPage() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending || !draftSetId) return;
 
-    // Capture items from step 1 before clearing state
-    if (progress.current === 0) {
+    // Step 1 (progress=1): capture items list
+    if (progress.current === 1) {
       const items = text.split(/[、,，]+/).map(s => s.trim()).filter(Boolean);
-      setItemsList(items);
+      capturedItemsRef.current = items;
       const initMap: Record<string, string> = {};
       items.forEach(item => { initMap[item] = '目立った傷なし'; });
+      capturedConditionMapRef.current = initMap;
+      setItemsList(items);
       setConditionMap(initMap);
     }
 
-    // Parse price from step 3 input
-    if (progress.current === 2) {
+    // Step 3 (progress=3): parse price
+    if (progress.current === 3) {
       const price = parsePrice(text);
       if (price !== null) parsedPriceRef.current = price;
     }
@@ -156,12 +158,16 @@ export default function SellSupportPage() {
       const newTexts = res.suggestedChips ?? [];
       newTexts.forEach(t => knownChipTexts.current.add(t));
       setChips(newTexts.map(t => ({ id: ++chipIdRef.current, text: t, exiting: false })));
-      // Don't show as chips for price step — show as recommendation card instead
-      setShowChips(newTexts.length > 0 && res.progress.current !== 2);
+      // Don't show chips as clickable for the price step (step 3) — show as card instead
+      setShowChips(newTexts.length > 0 && res.progress.current !== 3);
 
       if (res.done) {
         setTimeout(() => navigate(`/sell/confirm/${draftSetId}`, {
-          state: { suggestedPrice: parsedPriceRef.current },
+          state: {
+            suggestedPrice: parsedPriceRef.current,
+            itemsList: capturedItemsRef.current,
+            conditionMap: capturedConditionMapRef.current,
+          },
         }), 1200);
       }
     } catch {
@@ -205,6 +211,12 @@ export default function SellSupportPage() {
     }
   };
 
+  const handleConditionChange = (item: string, value: string) => {
+    const newMap = { ...capturedConditionMapRef.current, [item]: value };
+    capturedConditionMapRef.current = newMap;
+    setConditionMap(newMap);
+  };
+
   const addTextAsBadge = () => {
     const text = inputText.trim();
     if (!text || sending) return;
@@ -245,8 +257,8 @@ export default function SellSupportPage() {
         ))}
 
         {!sending && (
-          progress.current === 1 && itemsList.length > 0 ? (
-            /* Condition table for step 2 */
+          // Step 2: condition table (after items submitted, progress becomes 2)
+          progress.current === 2 && itemsList.length > 0 ? (
             <div className="condition-table-container">
               <table className="condition-table">
                 <thead>
@@ -262,7 +274,7 @@ export default function SellSupportPage() {
                       <td>
                         <select
                           value={conditionMap[item] ?? '目立った傷なし'}
-                          onChange={e => setConditionMap(prev => ({ ...prev, [item]: e.target.value }))}
+                          onChange={e => handleConditionChange(item, e.target.value)}
                           className="condition-select"
                         >
                           {CONDITION_OPTIONS.map(opt => (
@@ -275,8 +287,8 @@ export default function SellSupportPage() {
                 </tbody>
               </table>
             </div>
-          ) : progress.current === 2 ? (
-            /* Price recommendation card for step 3 */
+          ) : progress.current === 3 ? (
+            // Step 3: price recommendation card (no clickable chips)
             <div className="price-rec-card">
               <p className="price-rec-title">💡 おすすめ価格帯</p>
               {chips.length >= 2 && (
@@ -285,7 +297,6 @@ export default function SellSupportPage() {
               <p className="price-rec-reason">同ジャンルのスターターセットの相場に基づいた参考価格です。状態や付属品によって調整してください。</p>
             </div>
           ) : showChips && chips.length > 0 ? (
-            /* Regular chips */
             <div className="chat-chips">
               {chips.map(chip => (
                 <button
@@ -344,7 +355,11 @@ export default function SellSupportPage() {
                   }
                 }
               }}
-              placeholder={selectedBadges.length > 0 ? '' : progress.current === 1 ? '追加のメモを入力...' : 'メッセージを入力...'}
+              placeholder={
+                selectedBadges.length > 0 ? '' :
+                progress.current === 2 ? '追加のメモを入力...' :
+                'メッセージを入力...'
+              }
               disabled={sending}
             />
           </div>
