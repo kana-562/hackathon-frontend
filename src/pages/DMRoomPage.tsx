@@ -48,7 +48,8 @@ export default function DMRoomPage() {
           api.getDMMessages(rId),
         ]);
         const found = (roomsData ?? []).find((r: DMRoom) => r.id === rId);
-        setRoom(found ?? null);
+        // clear unread badge immediately
+        setRoom(found ? { ...found, unreadCount: 0 } : null);
         setMessages(msgsData ?? []);
         void api.markDMRead(rId).catch(() => {});
       } catch {

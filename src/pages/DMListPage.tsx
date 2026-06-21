@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { MOCK_DM_ROOMS } from '../api/mock';
 import { DMRoom } from '../types';
@@ -21,6 +21,7 @@ function formatTime(iso?: string): string {
 
 export default function DMListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoggedIn } = useAuth();
   const [rooms, setRooms] = useState<DMRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ export default function DMListPage() {
       }
     };
     void fetchRooms();
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, navigate, location.key]);
 
   return (
     <div className="page">

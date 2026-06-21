@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 
 function HomeIcon() {
   return (
@@ -37,6 +40,22 @@ function PersonIcon() {
 }
 
 export default function BottomNav() {
+  const { isLoggedIn } = useAuth();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const fetch = async () => {
+      try {
+        const rooms = await api.getDMRooms();
+        setUnread((rooms ?? []).reduce((s: number, r: { unreadCount?: number }) => s + (r.unreadCount ?? 0), 0));
+      } catch { /* ignore */ }
+    };
+    void fetch();
+    const id = setInterval(() => void fetch(), 15000);
+    return () => clearInterval(id);
+  }, [isLoggedIn]);
+
   return (
     <nav className="bottom-nav">
       <NavLink
@@ -66,7 +85,21 @@ export default function BottomNav() {
           isActive ? 'bottom-nav-item active' : 'bottom-nav-item'
         }
       >
-        <MessageIcon />
+        <div style={{ position: 'relative', display: 'inline-flex' }}>
+          <MessageIcon />
+          {unread > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: -3,
+              right: -3,
+              width: 9,
+              height: 9,
+              background: '#ff3b30',
+              borderRadius: '50%',
+              border: '1.5px solid white',
+            }} />
+          )}
+        </div>
         <span>メッセージ</span>
       </NavLink>
 
