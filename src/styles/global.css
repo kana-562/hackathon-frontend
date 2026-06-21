@@ -2074,9 +2074,9 @@ ol {
 
 .confirm-item-condition {
   flex-shrink: 0;
+  width: 130px !important;
   font-size: 12px !important;
   padding: 5px 24px 5px 8px !important;
-  min-width: 0;
 }
 
 .confirm-item-delete {
