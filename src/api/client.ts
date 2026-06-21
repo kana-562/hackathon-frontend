@@ -109,9 +109,12 @@ export const api = {
 
   // MyPage
   getMyPage: () => request<MyPageData>('GET', '/api/mypage'),
-  getMySelling: () => request<StarterSetCard[]>('GET', '/api/mypage/selling'),
-  getMyPurchases: () => request<TransactionDetail[]>('GET', '/api/mypage/purchases'),
-  getMyFavorites: () => request<StarterSetCard[]>('GET', '/api/mypage/favorites'),
+  getMySelling: () =>
+    request<{ sets: StarterSetCard[] }>('GET', '/api/mypage/selling').then((r) => r.sets ?? []),
+  getMyPurchases: () =>
+    request<{ transactions: TransactionDetail[] }>('GET', '/api/mypage/purchases').then((r) => r.transactions ?? []),
+  getMyFavorites: () =>
+    request<{ sets: StarterSetCard[] }>('GET', '/api/mypage/favorites').then((r) => r.sets ?? []),
 
   // DM
   getOrCreateDMRoom: (partnerId: number, setId?: number) =>
