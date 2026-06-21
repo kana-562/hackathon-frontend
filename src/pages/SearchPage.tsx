@@ -16,14 +16,35 @@ export default function SearchPage() {
 
   const initialQ = searchParams.get('q') ?? '';
   const initialSmart = searchParams.get('smart') === 'true';
+  const isBrowseMode = searchParams.get('browse') === 'true';
+  const initialSortParam = searchParams.get('sort');
+  const initSort = ((): 'recommended' | 'newest' | 'price' => {
+    if (initialSortParam === 'newest') return 'newest';
+    if (initialSortParam === 'price') return 'price';
+    return 'recommended';
+  })();
 
   const [searchValue, setSearchValue] = useState(initialQ);
   const [sets, setSets] = useState<StarterSetCard[]>([]);
   const [smartMessage, setSmartMessage] = useState<string | undefined>();
   const [relatedChips, setRelatedChips] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isBrowseMode);
   const [error, setError] = useState<string | null>(null);
-  const [sort, setSort] = useState<'recommended' | 'newest' | 'price'>('recommended');
+  const [sort, setSort] = useState<'recommended' | 'newest' | 'price'>(initSort);
+
+  const fetchBrowseSets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await api.getSets({});
+      setSets(result.sets);
+    } catch {
+      setSets(MOCK_SEARCH.sets);
+      setRelatedChips(MOCK_SEARCH.relatedChips ?? []);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchSets = async (q: string, smart: boolean) => {
     if (!q.trim()) return;
@@ -45,7 +66,11 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
-    void fetchSets(initialQ, initialSmart);
+    if (isBrowseMode) {
+      void fetchBrowseSets();
+    } else {
+      void fetchSets(initialQ, initialSmart);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -130,7 +155,7 @@ export default function SearchPage() {
         <LoadingSpinner message="検索中..." />
       ) : error ? (
         <ErrorMessage message={error} onRetry={() => fetchSets(searchValue, initialSmart)} />
-      ) : !searchValue.trim() ? (
+      ) : !searchValue.trim() && !isBrowseMode ? (
         <div className="empty-state">
           <span className="empty-state-icon">🔍</span>
           <p className="empty-state-title">キーワードを入力してください</p>
@@ -149,7 +174,9 @@ export default function SearchPage() {
       ) : (
         <>
           <p style={{ padding: '8px 16px 4px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            {sortedSets.length}件のセット
+            {isBrowseMode
+              ? `${sortedSets.length}件のセット`
+              : `「${searchValue}」の検索結果 ${sortedSets.length}件`}
           </p>
           <div className="set-list">
             {sortedSets.map((set) => (

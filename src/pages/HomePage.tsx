@@ -107,7 +107,7 @@ export default function HomePage() {
               <button
                 className="more-btn"
                 type="button"
-                onClick={() => navigate('/search')}
+                onClick={() => navigate('/search?browse=true')}
               >
                 もっと見る ›
               </button>
@@ -133,7 +133,7 @@ export default function HomePage() {
               <button
                 className="more-btn"
                 type="button"
-                onClick={() => navigate('/search?sort=newest')}
+                onClick={() => navigate('/search?browse=true&sort=newest')}
               >
                 もっと見る ›
               </button>
