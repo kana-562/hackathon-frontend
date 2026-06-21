@@ -145,7 +145,7 @@ export default function SellConfirmPage() {
   }
 
   return (
-    <div style={{ paddingBottom: 100 }}>
+    <div style={{ paddingBottom: 100, paddingTop: 'env(safe-area-inset-top, 0)' }}>
       {/* Header */}
       <div className="page-header">
         <button className="back-button" onClick={() => navigate(-1)} type="button">
@@ -158,8 +158,10 @@ export default function SellConfirmPage() {
       </div>
 
       {/* Image upload banner */}
+      <div style={{ margin: '12px 16px 0', borderRadius: 14, overflow: 'hidden' }}>
       <div
         className="preview-image-upload"
+        style={{ borderRadius: 0 }}
         onClick={() => fileInputRef.current?.click()}
         role="button"
         tabIndex={0}
@@ -185,6 +187,7 @@ export default function SellConfirmPage() {
           onChange={handleImageChange}
           style={{ display: 'none' }}
         />
+      </div>
       </div>
 
       {/* Editable form */}

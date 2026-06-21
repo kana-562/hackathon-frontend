@@ -1502,7 +1502,7 @@ ol {
    ========================================== */
 .price-rec-card {
   margin: 8px 16px 4px;
-  padding: 14px 16px;
+  padding: 16px;
   background: rgba(78, 205, 196, 0.07);
   border: 1.5px solid rgba(78, 205, 196, 0.3);
   border-radius: 14px;
@@ -1515,17 +1515,53 @@ ol {
   margin-bottom: 6px;
 }
 
-.price-rec-range {
-  font-size: 20px;
+.price-rec-amount {
+  font-size: 28px;
   font-weight: 800;
   color: var(--color-primary-dark);
   margin-bottom: 6px;
+  letter-spacing: -0.5px;
 }
 
 .price-rec-reason {
   font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.btn-price-decide {
+  width: 100%;
+  padding: 11px 0;
+  background: var(--color-primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btn-price-decide:active {
+  opacity: 0.85;
+}
+
+.condition-ok-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 8px 12px 12px;
+  padding: 11px 0;
+  background: var(--color-primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.condition-ok-btn:active {
+  opacity: 0.85;
 }
 
 .sell-support-progress-bar {
@@ -2006,8 +2042,7 @@ ol {
 }
 
 .sell-confirm-form {
-  padding: 0 16px;
-  padding-bottom: 100px;
+  padding: 20px 16px 100px;
 }
 
 .sell-publish-bar {

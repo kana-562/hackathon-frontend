@@ -55,6 +55,15 @@ function parsePrice(text: string): number | null {
   return null;
 }
 
+function getMedianPrice(chips: ChipItem[]): number | null {
+  const prices = chips
+    .map(c => parsePrice(c.text))
+    .filter((p): p is number => p !== null)
+    .sort((a, b) => a - b);
+  if (prices.length === 0) return null;
+  return prices[Math.floor(prices.length / 2)];
+}
+
 export default function SellSupportPage() {
   const { draftSetId } = useParams<{ draftSetId: string }>();
   const navigate = useNavigate();
@@ -64,7 +73,6 @@ export default function SellSupportPage() {
   const chipIdRef = useRef(0);
   const knownChipTexts = useRef(new Set<string>());
   const parsedPriceRef = useRef<number | null>(null);
-  // Refs for async-safe access when navigating after done
   const capturedItemsRef = useRef<string[]>([]);
   const capturedConditionMapRef = useRef<Record<string, string>>({});
 
@@ -84,13 +92,16 @@ export default function SellSupportPage() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [showChips, setShowChips] = useState(!!state?.suggestedChips?.length);
-  // progress.current: 1=items, 2=condition, 3=price, 4=note, 5=done
   const [progress, setProgress] = useState(state?.progress ?? { current: 1, total: 5 });
 
   const [itemsList, setItemsList] = useState<string[]>([]);
   const [conditionMap, setConditionMap] = useState<Record<string, string>>({});
+  const [recommendedPrice, setRecommendedPrice] = useState<number | null>(null);
 
   const chatRef = useRef<HTMLDivElement>(null);
+
+  const isConditionStep = progress.current === 2;
+  const isPriceStep = progress.current === 3;
 
   const scrollToBottom = () => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -99,7 +110,7 @@ export default function SellSupportPage() {
   useEffect(() => {
     scrollToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, sending]);
+  }, [messages, sending, isConditionStep, isPriceStep]);
 
   useEffect(() => {
     if (!state && draftSetId) {
@@ -112,31 +123,23 @@ export default function SellSupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const getSubmitText = () => {
-    // Condition table (step 2)
-    if (progress.current === 2 && capturedItemsRef.current.length > 0) {
-      return capturedItemsRef.current
-        .map(item => `${item}は${capturedConditionMapRef.current[item] ?? '目立った傷なし'}`)
-        .join('、');
-    }
-    return [...selectedBadges, inputText.trim()].filter(Boolean).join('、');
-  };
-
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending || !draftSetId) return;
 
-    // Step 1 (progress=1): capture items list
+    // Step 1: capture items list from the submitted text
     if (progress.current === 1) {
       const items = text.split(/[、,，]+/).map(s => s.trim()).filter(Boolean);
-      capturedItemsRef.current = items;
-      const initMap: Record<string, string> = {};
-      items.forEach(item => { initMap[item] = '目立った傷なし'; });
-      capturedConditionMapRef.current = initMap;
-      setItemsList(items);
-      setConditionMap(initMap);
+      if (items.length > 0) {
+        capturedItemsRef.current = items;
+        const initMap: Record<string, string> = {};
+        items.forEach(item => { initMap[item] = '目立った傷なし'; });
+        capturedConditionMapRef.current = initMap;
+        setItemsList(items);
+        setConditionMap(initMap);
+      }
     }
 
-    // Step 3 (progress=3): parse price
+    // Step 3: parse price from user input
     if (progress.current === 3) {
       const price = parsePrice(text);
       if (price !== null) parsedPriceRef.current = price;
@@ -155,11 +158,22 @@ export default function SellSupportPage() {
       setMessages(prev => [...prev, { sender: 'assistant', text: res.message }]);
       setProgress(res.progress);
 
-      const newTexts = res.suggestedChips ?? [];
-      newTexts.forEach(t => knownChipTexts.current.add(t));
-      setChips(newTexts.map(t => ({ id: ++chipIdRef.current, text: t, exiting: false })));
-      // Don't show chips as clickable for the price step (step 3) — show as card instead
-      setShowChips(newTexts.length > 0 && res.progress.current !== 3);
+      const newChips = (res.suggestedChips ?? []).map(t => {
+        knownChipTexts.current.add(t);
+        return { id: ++chipIdRef.current, text: t, exiting: false };
+      });
+      setChips(newChips);
+
+      // Step 3 (price): compute recommended price from chips
+      if (res.progress.current === 3 && newChips.length > 0) {
+        const median = getMedianPrice(newChips);
+        setRecommendedPrice(median);
+        setShowChips(false); // price step uses card, not chip buttons
+      } else if (res.progress.current === 2) {
+        setShowChips(false); // condition step uses table, not chip buttons
+      } else {
+        setShowChips(newChips.length > 0);
+      }
 
       if (res.done) {
         setTimeout(() => navigate(`/sell/confirm/${draftSetId}`, {
@@ -178,6 +192,27 @@ export default function SellSupportPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  // Submit condition table via OK button
+  const submitConditions = () => {
+    const items = capturedItemsRef.current;
+    if (items.length === 0) {
+      // Fallback: submit whatever is in the input
+      void sendMessage(inputText.trim() || '全て目立った傷なし');
+      return;
+    }
+    const text = items
+      .map(item => `${item}は${capturedConditionMapRef.current[item] ?? '目立った傷なし'}`)
+      .join('、');
+    void sendMessage(text);
+  };
+
+  // Submit recommended price via "この価格で決定" button
+  const applyRecommendedPrice = () => {
+    if (recommendedPrice === null) return;
+    parsedPriceRef.current = recommendedPrice;
+    void sendMessage(`${recommendedPrice}円`);
   };
 
   const handleChipClick = (chip: ChipItem) => {
@@ -224,6 +259,9 @@ export default function SellSupportPage() {
     setInputText('');
   };
 
+  const getSubmitText = () =>
+    [...selectedBadges, inputText.trim()].filter(Boolean).join('、');
+
   const handleSubmit = () => void sendMessage(getSubmitText());
   const progressPercent = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
   const submitText = getSubmitText();
@@ -257,59 +295,92 @@ export default function SellSupportPage() {
         ))}
 
         {!sending && (
-          // Step 2: condition table (after items submitted, progress becomes 2)
-          progress.current === 2 && itemsList.length > 0 ? (
-            <div className="condition-table-container">
-              <table className="condition-table">
-                <thead>
-                  <tr>
-                    <th>アイテム</th>
-                    <th>状態</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itemsList.map(item => (
-                    <tr key={item}>
-                      <td>{item}</td>
-                      <td>
-                        <select
-                          value={conditionMap[item] ?? '目立った傷なし'}
-                          onChange={e => handleConditionChange(item, e.target.value)}
-                          className="condition-select"
-                        >
-                          {CONDITION_OPTIONS.map(opt => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : progress.current === 3 ? (
-            // Step 3: price recommendation card (no clickable chips)
-            <div className="price-rec-card">
-              <p className="price-rec-title">💡 おすすめ価格帯</p>
-              {chips.length >= 2 && (
-                <p className="price-rec-range">{chips[0].text} 〜 {chips[chips.length - 1].text}</p>
-              )}
-              <p className="price-rec-reason">同ジャンルのスターターセットの相場に基づいた参考価格です。状態や付属品によって調整してください。</p>
-            </div>
-          ) : showChips && chips.length > 0 ? (
-            <div className="chat-chips">
-              {chips.map(chip => (
+          <>
+            {/* Step 2: condition table */}
+            {isConditionStep && (
+              <div className="condition-table-container">
+                {itemsList.length > 0 ? (
+                  <table className="condition-table">
+                    <thead>
+                      <tr>
+                        <th>アイテム</th>
+                        <th>状態</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemsList.map(item => (
+                        <tr key={item}>
+                          <td>{item}</td>
+                          <td>
+                            <select
+                              value={conditionMap[item] ?? '目立った傷なし'}
+                              onChange={e => handleConditionChange(item, e.target.value)}
+                              className="condition-select"
+                            >
+                              {CONDITION_OPTIONS.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ padding: '14px 16px', color: 'var(--color-text-secondary)', fontSize: 13 }}>
+                    状態を入力欄に直接入力してください
+                  </div>
+                )}
                 <button
-                  key={chip.id}
-                  className={`chat-chip${chip.exiting ? ' exiting' : ''}`}
-                  onClick={() => !chip.exiting && handleChipClick(chip)}
+                  className="condition-ok-btn"
+                  onClick={submitConditions}
+                  disabled={sending}
                   type="button"
                 >
-                  {chip.text}
+                  この状態で決定
                 </button>
-              ))}
-            </div>
-          ) : null
+              </div>
+            )}
+
+            {/* Step 3: price card */}
+            {isPriceStep && (
+              <div className="price-rec-card">
+                <p className="price-rec-title">💡 おすすめ価格</p>
+                {recommendedPrice !== null ? (
+                  <>
+                    <p className="price-rec-amount">¥{recommendedPrice.toLocaleString('ja-JP')}</p>
+                    <p className="price-rec-reason">同カテゴリのスターターセット相場をもとにした参考価格です。状態や内容によって調整してください。</p>
+                    <button
+                      className="btn-price-decide"
+                      onClick={applyRecommendedPrice}
+                      disabled={sending}
+                      type="button"
+                    >
+                      この価格で決定
+                    </button>
+                  </>
+                ) : (
+                  <p className="price-rec-reason">希望価格をチャット欄に入力してください。</p>
+                )}
+              </div>
+            )}
+
+            {/* Other steps: chip buttons */}
+            {!isConditionStep && !isPriceStep && showChips && chips.length > 0 && (
+              <div className="chat-chips">
+                {chips.map(chip => (
+                  <button
+                    key={chip.id}
+                    className={`chat-chip${chip.exiting ? ' exiting' : ''}`}
+                    onClick={() => !chip.exiting && handleChipClick(chip)}
+                    type="button"
+                  >
+                    {chip.text}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {sending && (
@@ -321,63 +392,67 @@ export default function SellSupportPage() {
         )}
       </div>
 
-      {/* Input area */}
-      <div className="sell-support-input-area">
-        <div className="sell-support-input-row">
-          <div className={`chat-input-with-badges${selectedBadges.length > 0 ? ' has-badges' : ''}`}>
-            {selectedBadges.map((badge, i) => (
-              <span key={i} className="input-badge">
-                {badge}
-                <button
-                  className="input-badge-remove"
-                  onClick={() => removeBadge(i)}
-                  type="button"
-                  aria-label={`${badge}を削除`}
-                >×</button>
-              </span>
-            ))}
-            <input
-              className="chat-input-inner"
-              type="text"
-              value={inputText}
-              onChange={e => setInputText(e.target.value)}
-              onKeyDown={e => {
-                if (e.nativeEvent.isComposing) return;
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSubmit();
-                } else if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (inputText.trim()) {
-                    addTextAsBadge();
-                  } else {
+      {/* Input area — hidden during condition step if table is shown */}
+      {!(isConditionStep && itemsList.length > 0) && (
+        <div className="sell-support-input-area">
+          <div className="sell-support-input-row">
+            <div className={`chat-input-with-badges${selectedBadges.length > 0 ? ' has-badges' : ''}`}>
+              {selectedBadges.map((badge, i) => (
+                <span key={i} className="input-badge">
+                  {badge}
+                  <button
+                    className="input-badge-remove"
+                    onClick={() => removeBadge(i)}
+                    type="button"
+                    aria-label={`${badge}を削除`}
+                  >×</button>
+                </span>
+              ))}
+              <input
+                className="chat-input-inner"
+                type="text"
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.nativeEvent.isComposing) return;
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault();
                     handleSubmit();
+                  } else if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (progress.current === 1 && inputText.trim()) {
+                      // Step 1 only: Enter converts text to badge chip
+                      addTextAsBadge();
+                    } else {
+                      // All other steps: Enter sends the message
+                      handleSubmit();
+                    }
                   }
+                }}
+                placeholder={
+                  selectedBadges.length > 0 ? '' :
+                  isPriceStep ? '金額を入力（例：8000）' :
+                  'メッセージを入力...'
                 }
-              }}
-              placeholder={
-                selectedBadges.length > 0 ? '' :
-                progress.current === 2 ? '追加のメモを入力...' :
-                'メッセージを入力...'
-              }
-              disabled={sending}
-            />
+                disabled={sending}
+              />
+            </div>
+            <button
+              className="chat-send-btn"
+              onClick={handleSubmit}
+              disabled={!submitText || sending}
+              type="button"
+              aria-label="送信"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
           </div>
-          <button
-            className="chat-send-btn"
-            onClick={handleSubmit}
-            disabled={!submitText || sending}
-            type="button"
-            aria-label="送信"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
+          <div className="chat-input-hint">⌘+Enter で送信</div>
         </div>
-        <div className="chat-input-hint">⌘+Enter で送信</div>
-      </div>
+      )}
     </div>
   );
 }
