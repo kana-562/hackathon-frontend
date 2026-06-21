@@ -1,16 +1,44 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 import { StarterSetCard } from '../types';
 
 interface Props {
   set: StarterSetCard;
-  onFavorite?: (id: number, current: boolean) => void;
 }
 
 export default function SetCard({ set }: Props) {
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(set.isFavorite);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const handleClick = () => {
     navigate(`/sets/${set.id}`);
+  };
+
+  const handleFavorite = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn) {
+      navigate('/login');
+      return;
+    }
+    if (favoriteLoading) return;
+    setFavoriteLoading(true);
+    try {
+      if (isFavorite) {
+        await api.removeFavorite(set.id);
+        setIsFavorite(false);
+      } else {
+        await api.addFavorite(set.id);
+        setIsFavorite(true);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setFavoriteLoading(false);
+    }
   };
 
   return (
@@ -36,6 +64,15 @@ export default function SetCard({ set }: Props) {
         </div>
         <span className="set-card-readiness">セット充実度 {set.readinessScore}%</span>
       </div>
+      <button
+        className={`set-card-favorite-btn${isFavorite ? ' active' : ''}`}
+        onClick={handleFavorite}
+        type="button"
+        aria-label={isFavorite ? 'お気に入り解除' : 'お気に入り追加'}
+        disabled={favoriteLoading}
+      >
+        {isFavorite ? '❤️' : '🤍'}
+      </button>
     </div>
   );
 }
