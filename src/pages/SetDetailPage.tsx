@@ -138,7 +138,7 @@ function QuestionBottomSheet({ setId, onClose }: QuestionBottomSheetProps) {
             className="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmit()}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && handleSubmit()}
             placeholder="質問を入力..."
             disabled={sending}
           />

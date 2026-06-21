@@ -233,7 +233,7 @@ export default function DMRoomPage() {
           }}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && void handleSend()}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && void handleSend()}
           placeholder="メッセージを入力..."
           disabled={sending}
         />

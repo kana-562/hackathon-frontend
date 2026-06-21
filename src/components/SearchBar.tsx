@@ -11,7 +11,7 @@ export default function SearchBar({ value, onChange, onSubmit, placeholder }: Pr
   const [focused, setFocused] = useState(false);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && value.trim()) {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing && value.trim()) {
       onSubmit(value.trim(), false);
     }
   };
