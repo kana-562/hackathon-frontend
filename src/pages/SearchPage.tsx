@@ -58,8 +58,14 @@ export default function SearchPage() {
       setSmartMessage(result.smartMessage);
       setRelatedChips(result.relatedChips ?? []);
     } catch {
-      setSets(MOCK_SEARCH.sets);
-      setRelatedChips(MOCK_SEARCH.relatedChips ?? []);
+      const lowerQ = q.toLowerCase();
+      const filtered = MOCK_SEARCH.sets.filter(s =>
+        s.title.toLowerCase().includes(lowerQ) ||
+        (s.hobbyName ?? '').toLowerCase().includes(lowerQ) ||
+        (s.categoryName ?? '').toLowerCase().includes(lowerQ)
+      );
+      setSets(filtered);
+      setRelatedChips([]);
     } finally {
       setLoading(false);
     }

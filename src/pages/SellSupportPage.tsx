@@ -92,7 +92,7 @@ export default function SellSupportPage() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [showChips, setShowChips] = useState(!!state?.suggestedChips?.length);
-  const [progress, setProgress] = useState(state?.progress ?? { current: 1, total: 5 });
+  const [progress, setProgress] = useState(state?.progress ? { ...state.progress, total: 4 } : { current: 1, total: 4 });
 
   const [itemsList, setItemsList] = useState<string[]>([]);
   const [conditionMap, setConditionMap] = useState<Record<string, string>>({});
@@ -156,7 +156,7 @@ export default function SellSupportPage() {
     try {
       const res = await api.sendSellMessage(Number(draftSetId), text);
       setMessages(prev => [...prev, { sender: 'assistant', text: res.message }]);
-      setProgress(res.progress);
+      setProgress({ ...res.progress, total: 4 });
 
       const newChips = (res.suggestedChips ?? []).map(t => {
         knownChipTexts.current.add(t);
