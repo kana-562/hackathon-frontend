@@ -92,6 +92,8 @@ export default function MyPage() {
     void fetchMyPage();
   }, [isLoggedIn, navigate]);
 
+  const refreshParam = searchParams.get('refresh');
+
   useEffect(() => {
     const fetchTab = async () => {
       setTabLoading(true);
@@ -125,7 +127,7 @@ export default function MyPage() {
       }
     };
     void fetchTab();
-  }, [activeTab, isLoggedIn, location.key]);
+  }, [activeTab, isLoggedIn, location.key, refreshParam]);
 
   const handleLogout = () => {
     logout();

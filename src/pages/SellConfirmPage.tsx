@@ -40,6 +40,7 @@ export default function SellConfirmPage() {
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [published, setPublished] = useState(false);
 
   // Image upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,7 +156,7 @@ export default function SellConfirmPage() {
         items,
       });
       await api.publishDraft(Number(draftSetId));
-      navigate('/mypage?tab=selling');
+      setPublished(true);
     } catch (e) {
       setPublishError(e instanceof Error ? e.message : '出品に失敗しました');
     } finally {
@@ -165,6 +166,34 @@ export default function SellConfirmPage() {
 
   if (loading) return <LoadingSpinner message="下書きを読み込み中..." />;
   if (error || !draft) return <ErrorMessage message={error ?? '下書きが見つかりません'} onRetry={fetchDraft} />;
+
+  if (published) {
+    return (
+      <div className="page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', padding: '32px 24px', textAlign: 'center' }}>
+        <div style={{ fontSize: 72, marginBottom: 16 }}>🎉</div>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', marginBottom: 8 }}>出品しました！</h1>
+        <p style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
+          「{title}」が出品されました。<br />購入者が現れるまで編集・削除できます。
+        </p>
+        <button
+          className="btn-primary"
+          style={{ marginBottom: 12 }}
+          onClick={() => navigate('/mypage?tab=selling&refresh=1')}
+          type="button"
+        >
+          出品中セットを確認する
+        </button>
+        <button
+          className="btn-secondary"
+          onClick={() => navigate('/')}
+          type="button"
+          style={{ background: 'none', border: '1.5px solid var(--color-border)', borderRadius: 12, padding: '12px 24px', fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)', width: '100%', cursor: 'pointer' }}
+        >
+          ホームに戻る
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ paddingBottom: 100, paddingTop: 'env(safe-area-inset-top, 0)' }}>
